@@ -1,0 +1,298 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+}
+
+enum CommunityRole {
+  ADMINISTRATOR
+  RESIDENT
+  SECURITY_GUARD
+  MAINTENANCE_STAFF
+}
+
+enum UnitOccupancyType {
+  OWNER
+  TENANT
+  FAMILY_MEMBER
+  OCCUPANT
+}
+
+enum ServiceRequestCategory {
+  PLUMBING
+  ELECTRICAL
+  CLEANING
+  SECURITY
+  GENERAL
+}
+
+enum ServiceRequestStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+enum VisitorPassStatus {
+  EXPECTED
+  CHECKED_IN
+  CHECKED_OUT
+}
+
+enum VisitorPurpose {
+  PERSONAL_VISIT
+  DELIVERY
+  SERVICE
+}
+
+enum AmenityBookingStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+model User {
+  id                  String                @id @default(uuid()) @db.Uuid
+  email               String                @unique @db.VarChar(320)
+  passwordHash        String                @db.VarChar(255)
+  phone               String?               @unique @db.VarChar(20)
+  fullName            String                @db.VarChar(120)
+  createdAt           DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime              @updatedAt @db.Timestamptz(3)
+  memberships         CommunityMembership[]
+  authSessions        AuthSession[]
+  createdInvitations  CommunityInvitation[] @relation("InvitationCreator")
+  redeemedInvitations CommunityInvitation[] @relation("InvitationRedeemer")
+  visitorChecksIn     VisitorPass[]         @relation("VisitorPassCheckIn")
+  visitorChecksOut    VisitorPass[]         @relation("VisitorPassCheckOut")
+}
+
+model AuthSession {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  tokenHash String   @unique @db.VarChar(64)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Community {
+  id              String                @id @default(uuid()) @db.Uuid
+  name            String                @db.VarChar(160)
+  slug            String                @unique @db.VarChar(80)
+  timezone        String                @default("UTC") @db.VarChar(64)
+  createdAt       DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime              @updatedAt @db.Timestamptz(3)
+  blocks          Block[]
+  memberships     CommunityMembership[]
+  invitations     CommunityInvitation[]
+  serviceRequests ServiceRequest[]
+  visitorPasses   VisitorPass[]
+  amenities       Amenity[]
+  amenityBookings AmenityBooking[]
+}
+
+model Block {
+  id          String    @id @default(uuid()) @db.Uuid
+  communityId String    @db.Uuid
+  name        String    @db.VarChar(120)
+  code        String    @db.VarChar(32)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  units       Unit[]
+
+  @@unique([communityId, id])
+  @@unique([communityId, code])
+  @@index([communityId])
+}
+
+model Unit {
+  id            String                    @id @default(uuid()) @db.Uuid
+  communityId   String                    @db.Uuid
+  blockId       String                    @db.Uuid
+  number        String                    @db.VarChar(32)
+  floor         Int?
+  createdAt     DateTime                  @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime                  @updatedAt @db.Timestamptz(3)
+  block         Block                     @relation(fields: [communityId, blockId], references: [communityId, id], onDelete: Cascade)
+  memberships   CommunityMembershipUnit[]
+  invitations   CommunityInvitation[]
+  visitorPasses VisitorPass[]
+
+  @@unique([communityId, id])
+  @@unique([blockId, number])
+  @@index([communityId])
+}
+
+model CommunityInvitation {
+  id               String    @id @default(uuid()) @db.Uuid
+  communityId      String    @db.Uuid
+  unitId           String    @db.Uuid
+  createdByUserId  String    @db.Uuid
+  redeemedByUserId String?   @db.Uuid
+  codeHash         String    @unique @db.VarChar(64)
+  expiresAt        DateTime  @db.Timestamptz(3)
+  redeemedAt       DateTime? @db.Timestamptz(3)
+  revokedAt        DateTime? @db.Timestamptz(3)
+  createdAt        DateTime  @default(now()) @db.Timestamptz(3)
+  community        Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  unit             Unit      @relation(fields: [communityId, unitId], references: [communityId, id], onDelete: Cascade)
+  createdBy        User      @relation("InvitationCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  redeemedBy       User?     @relation("InvitationRedeemer", fields: [redeemedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([communityId, createdAt])
+  @@index([unitId])
+}
+
+model CommunityMembership {
+  id                   String                       @id @default(uuid()) @db.Uuid
+  communityId          String                       @db.Uuid
+  userId               String                       @db.Uuid
+  status               MembershipStatus             @default(ACTIVE)
+  createdAt            DateTime                     @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime                     @updatedAt @db.Timestamptz(3)
+  community            Community                    @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  user                 User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roles                CommunityMembershipRole[]
+  units                CommunityMembershipUnit[]
+  serviceRequests      ServiceRequest[]
+  requestStatusUpdates ServiceRequestStatusUpdate[]
+  createdVisitorPasses VisitorPass[]                @relation("VisitorPassCreator")
+  amenityBookings      AmenityBooking[]
+
+  @@unique([communityId, id])
+  @@unique([communityId, userId])
+  @@index([userId])
+}
+
+model CommunityMembershipRole {
+  communityId  String              @db.Uuid
+  membershipId String              @db.Uuid
+  role         CommunityRole
+  membership   CommunityMembership @relation(fields: [communityId, membershipId], references: [communityId, id], onDelete: Cascade)
+
+  @@id([communityId, membershipId, role])
+  @@index([communityId, role])
+}
+
+model CommunityMembershipUnit {
+  communityId  String              @db.Uuid
+  membershipId String              @db.Uuid
+  unitId       String              @db.Uuid
+  occupancy    UnitOccupancyType
+  createdAt    DateTime            @default(now()) @db.Timestamptz(3)
+  membership   CommunityMembership @relation(fields: [communityId, membershipId], references: [communityId, id], onDelete: Cascade)
+  unit         Unit                @relation(fields: [communityId, unitId], references: [communityId, id], onDelete: Cascade)
+
+  @@id([communityId, membershipId, unitId])
+  @@index([communityId, unitId])
+}
+
+model ServiceRequest {
+  id                    String                       @id @default(uuid()) @db.Uuid
+  communityId           String                       @db.Uuid
+  createdByMembershipId String                       @db.Uuid
+  title                 String                       @db.VarChar(120)
+  category              ServiceRequestCategory
+  description           String?                      @db.VarChar(1000)
+  location              String                       @db.VarChar(160)
+  status                ServiceRequestStatus         @default(OPEN)
+  createdAt             DateTime                     @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime                     @updatedAt @db.Timestamptz(3)
+  community             Community                    @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  createdByMembership   CommunityMembership          @relation(fields: [communityId, createdByMembershipId], references: [communityId, id], onDelete: Cascade)
+  statusUpdates         ServiceRequestStatusUpdate[]
+
+  @@unique([communityId, id])
+  @@index([communityId, createdAt])
+  @@index([createdByMembershipId, createdAt])
+  @@index([communityId, status, createdAt])
+}
+
+model ServiceRequestStatusUpdate {
+  id                    String               @id @default(uuid()) @db.Uuid
+  communityId           String               @db.Uuid
+  requestId             String               @db.Uuid
+  updatedByMembershipId String               @db.Uuid
+  previousStatus        ServiceRequestStatus
+  status                ServiceRequestStatus
+  note                  String?              @db.VarChar(500)
+  createdAt             DateTime             @default(now()) @db.Timestamptz(3)
+  serviceRequest        ServiceRequest       @relation(fields: [communityId, requestId], references: [communityId, id], onDelete: Cascade)
+  updatedByMembership   CommunityMembership  @relation(fields: [communityId, updatedByMembershipId], references: [communityId, id], onDelete: Cascade)
+
+  @@index([communityId, requestId, createdAt])
+}
+
+model VisitorPass {
+  id                    String              @id @default(uuid()) @db.Uuid
+  communityId           String              @db.Uuid
+  unitId                String              @db.Uuid
+  createdByMembershipId String              @db.Uuid
+  checkedInByUserId     String?             @db.Uuid
+  checkedOutByUserId    String?             @db.Uuid
+  visitorName           String              @db.VarChar(120)
+  purpose               VisitorPurpose
+  expectedAt            DateTime            @db.Timestamptz(3)
+  status                VisitorPassStatus   @default(EXPECTED)
+  checkedInAt           DateTime?           @db.Timestamptz(3)
+  checkedOutAt          DateTime?           @db.Timestamptz(3)
+  createdAt             DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime            @updatedAt @db.Timestamptz(3)
+  community             Community           @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  unit                  Unit                @relation(fields: [communityId, unitId], references: [communityId, id], onDelete: Cascade)
+  createdByMembership   CommunityMembership @relation("VisitorPassCreator", fields: [communityId, createdByMembershipId], references: [communityId, id], onDelete: Cascade)
+  checkedInBy           User?               @relation("VisitorPassCheckIn", fields: [checkedInByUserId], references: [id], onDelete: SetNull)
+  checkedOutBy          User?               @relation("VisitorPassCheckOut", fields: [checkedOutByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([communityId, id])
+  @@index([communityId, expectedAt])
+  @@index([createdByMembershipId, expectedAt])
+  @@index([communityId, status, expectedAt])
+}
+
+model Amenity {
+  id          String           @id @default(uuid()) @db.Uuid
+  communityId String           @db.Uuid
+  name        String           @db.VarChar(120)
+  description String?          @db.VarChar(500)
+  location    String?          @db.VarChar(120)
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime         @updatedAt @db.Timestamptz(3)
+  community   Community        @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  bookings    AmenityBooking[]
+
+  @@unique([communityId, id])
+  @@index([communityId, isActive, name])
+}
+
+model AmenityBooking {
+  id                   String               @id @default(uuid()) @db.Uuid
+  communityId          String               @db.Uuid
+  amenityId            String               @db.Uuid
+  bookedByMembershipId String               @db.Uuid
+  startsAt             DateTime             @db.Timestamptz(3)
+  endsAt               DateTime             @db.Timestamptz(3)
+  status               AmenityBookingStatus @default(CONFIRMED)
+  createdAt            DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime             @updatedAt @db.Timestamptz(3)
+  community            Community            @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  amenity              Amenity              @relation(fields: [communityId, amenityId], references: [communityId, id], onDelete: Cascade)
+  bookedByMembership   CommunityMembership  @relation(fields: [communityId, bookedByMembershipId], references: [communityId, id], onDelete: Cascade)
+
+  @@unique([communityId, id])
+  @@index([communityId, startsAt])
+  @@index([amenityId, status, startsAt, endsAt])
+  @@index([bookedByMembershipId, startsAt])
+}
