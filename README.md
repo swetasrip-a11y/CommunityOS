@@ -4,6 +4,9 @@ CommunityOS is a community-management platform for residents, property
 administrators, security guards, and maintenance teams. It is built with React,
 TypeScript, NestJS, PostgreSQL, and Prisma.
 
+# Project Demo Video
+https://drive.google.com/file/d/1RfaWBdALryEX3-SL1cI90xFLhr5o0oy1/view?usp=sharing
+
 ## Project structure
 
 - [`backend/`](./backend) — NestJS API, PostgreSQL database, Prisma schema and
@@ -12,6 +15,31 @@ TypeScript, NestJS, PostgreSQL, and Prisma.
   login, persistent sessions, and a responsive dashboard.
 - [`docs/`](./docs) — product/UI design, system architecture, technical
   reference, API documentation, and security notes.
+
+# Project Screenshots
+Administrator page 
+<img width="1866" height="895" alt="image" src="https://github.com/user-attachments/assets/ae6d6517-7c70-4472-99a6-f80357b817e5" />
+
+Request
+<img width="1872" height="892" alt="image" src="https://github.com/user-attachments/assets/945a6d0d-d5a0-4958-8819-fca5cf89e9b4" />
+
+Visitor Management
+<img width="1860" height="900" alt="image" src="https://github.com/user-attachments/assets/684c08b3-e126-4751-ad17-c18346222826" />
+
+Code
+<img width="1871" height="877" alt="image" src="https://github.com/user-attachments/assets/d7c728a3-b976-4400-a513-0174f8415103" />
+
+Amenities
+<img width="1857" height="882" alt="image" src="https://github.com/user-attachments/assets/3d18a3dc-d823-4332-b526-208495ddf6f7" />
+
+Request on Resident Side
+<img width="1867" height="892" alt="image" src="https://github.com/user-attachments/assets/42f100e0-7d88-4548-99a0-533e1b6df583" />
+
+Visitor Pass
+<img width="1832" height="881" alt="image" src="https://github.com/user-attachments/assets/faeda4d0-9f3f-478e-bd6f-3e416660122b" />
+
+Book
+<img width="1862" height="891" alt="image" src="https://github.com/user-attachments/assets/36be5080-a0db-4791-81ba-88abd26d68f5" />
 
 ## Run locally on Windows
 
