@@ -141,6 +141,7 @@ describe('AmenitiesService', () => {
       canCancel: true,
     });
     expect(lockAmenity).toHaveBeenCalled();
+    expect(lockAmenity.mock.calls[0][0].join('')).toContain('::bigint');
     expect(findOverlappingBooking).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({

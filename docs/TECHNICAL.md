@@ -162,7 +162,7 @@ API behavior tests.
 ## Current implementation boundaries
 
 - Payment and maintenance billing APIs, tables, and workflows do not exist.
-- Dashboard maintenance totals and announcements are sample data.
-- Block-specific announcements are not in the current scope.
+- Billing, payments, and announcements are not implemented in the current
+  interface or backend scope.
 - Email verification, password recovery, authentication rate limits, audit
   retention policy, and production deployment automation are not implemented.

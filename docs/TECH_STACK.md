@@ -6,6 +6,34 @@ CommunityOS uses a TypeScript-centered stack: React and Vite in the browser,
 NestJS on Node.js for the API, PostgreSQL for persistence, and Prisma for
 typed database access and migrations.
 
+## Stack at a glance
+
+| Layer | Technology | Project version / configuration |
+| --- | --- | --- |
+| Browser UI | React, React DOM | 19.x |
+| UI language | TypeScript | 6.x in the frontend; 5.x in the backend |
+| Frontend bundler | Vite with the React plugin | Vite 8.x |
+| Styling and fonts | Custom CSS; DM Sans and Space Grotesk via Fontsource | No component or CSS framework |
+| API runtime | Node.js and NestJS | Node.js 20 or newer; NestJS 10.x |
+| API validation | class-validator and class-transformer | DTO-based runtime validation |
+| Database | PostgreSQL | 16, run locally through Docker Compose |
+| Database access | Prisma Client and Prisma Migrate | Prisma 6.x |
+| Authentication | JWT access tokens, HttpOnly refresh-session cookie, bcryptjs password hashing | Session token hashes are persisted in PostgreSQL |
+| Backend tests | Jest, Supertest, NestJS testing utilities | Unit and end-to-end API tests |
+
+Version ranges are declared in the frontend and backend `package.json` files;
+the lockfiles pin the installed dependency versions. The backend targets
+TypeScript 5.x, while the standalone frontend uses TypeScript 6.x.
+
+## Repository layout
+
+- `frontend/` contains the React single-page application, shared CSS, and Vite
+  configuration.
+- `backend/` contains the NestJS modular API, Prisma schema, SQL migrations,
+  and tests.
+- `docs/` contains the product, design, architecture, API, security, and
+  technical documentation.
+
 ## Why this stack fits the project
 
 ### TypeScript across frontend and backend
@@ -59,6 +87,13 @@ specific PostgreSQL behavior, such as serializing amenity reservations.
 Docker Compose provides a repeatable PostgreSQL instance without requiring a
 separately installed local database server. The named volume keeps development
 data when the container is stopped.
+
+### Validation and automated tests
+
+NestJS DTOs use `class-validator` and `class-transformer` for runtime request
+validation. Jest covers backend service logic, and Supertest exercises
+HTTP-level API behavior. The frontend production build runs TypeScript checks
+before Vite generates optimized browser assets.
 
 ### JWT and database-backed sessions
 

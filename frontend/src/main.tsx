@@ -16,11 +16,8 @@ type IconName =
   | 'inbox'
   | 'door'
   | 'calendar'
-  | 'wallet'
-  | 'megaphone'
   | 'help'
   | 'search'
-  | 'bell'
   | 'chevron'
   | 'arrow'
   | 'plus'
@@ -297,11 +294,8 @@ function Icon({ name, size = 20, className }: { name: IconName; size?: number; c
     inbox: <><path d="M4 4h16l1.5 10H16l-2 3h-4l-2-3H2.5L4 4Z" /><path d="M4 4v15h16V4" /></>,
     door: <><path d="M4 21h16M6 21V4l12-2v19" /><path d="M14 12h.01" /></>,
     calendar: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /></>,
-    wallet: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 9h18M16 15h2" /><path d="M6 5V3h12v2" /></>,
-    megaphone: <><path d="m3 11 18-5v12L3 14v-3Z" /><path d="m7 15 2 6h4l-2-5M21 9a3 3 0 0 1 0 6" /></>,
     help: <><circle cx="12" cy="12" r="9" /><path d="M9.6 9a2.5 2.5 0 1 1 4.6 1.4c-1 1.1-2.2 1.4-2.2 3.1M12 17.5h.01" /></>,
     search: <><circle cx="10.8" cy="10.8" r="6.8" /><path d="m16 16 4.5 4.5" /></>,
-    bell: <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4" /></>,
     chevron: <path d="m7 10 5 5 5-5" />,
     arrow: <><path d="M7 17 17 7M7 7h10v10" /></>,
     plus: <><path d="M12 5v14M5 12h14" /></>,
@@ -339,42 +333,7 @@ const navigation: { label: string; icon: IconName; section: string }[] = [
   { label: 'My requests', icon: 'inbox', section: 'Your community' },
   { label: 'Visitor log', icon: 'door', section: 'Your community' },
   { label: 'Amenities', icon: 'calendar', section: 'Your community' },
-  { label: 'My payments', icon: 'wallet', section: 'Your community' },
-  { label: 'Announcements', icon: 'megaphone', section: 'Your community' },
 ]
-
-const announcements = [
-  {
-    tag: 'BLOCK A',
-    date: 'TODAY · 9:15 AM',
-    title: 'Water tank cleaning this Saturday',
-    body: 'Water supply may be interrupted between 10 am and 1 pm. Please plan accordingly.',
-    color: 'mint',
-  },
-  {
-    tag: 'COMMUNITY',
-    date: 'YESTERDAY',
-    title: 'The garden has a new look 🌱',
-    body: 'The east courtyard is ready for you. Take a moment to enjoy the refreshed space.',
-    color: 'sand',
-  },
-  {
-    tag: 'BLOCK A',
-    date: 'FRIDAY',
-    title: 'A reminder about quiet hours',
-    body: 'Let’s keep shared spaces peaceful between 10 pm and 7 am. Thanks for being thoughtful neighbors.',
-    color: 'mint',
-  },
-  {
-    tag: 'COMMUNITY',
-    date: 'THURSDAY',
-    title: 'Weekend yoga in the garden',
-    body: 'Join your neighbors for a relaxed outdoor yoga session this Sunday at 7:30 am. All levels welcome.',
-    color: 'sand',
-  },
-]
-
-const pendingMaintenance = 4850
 function App() {
   const [authUser, setAuthUser] = useState<AuthenticatedUser | null>(null)
   const [accessToken, setAccessToken] = useState<string | null>(null)
@@ -423,10 +382,7 @@ function App() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [notificationsOpen, setNotificationsOpen] = useState(false)
-  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(true)
   const [showAllRequests, setShowAllRequests] = useState(false)
-  const [showAllAnnouncements, setShowAllAnnouncements] = useState(false)
   const [modalType, setModalType] = useState<'request' | 'visitor' | 'booking' | null>(null)
   const [toast, setToast] = useState('')
   const [communityMenuOpen, setCommunityMenuOpen] = useState(false)
@@ -940,6 +896,13 @@ function App() {
       ) {
         throw new Error('Choose a valid start and end time.')
       }
+      const duration = endsAt.getTime() - startsAt.getTime()
+      if (startsAt.getTime() <= Date.now() || duration <= 0) {
+        throw new Error('Choose a future end time that comes after the start.')
+      }
+      if (duration > 4 * 60 * 60 * 1000) {
+        throw new Error('Amenity bookings can be up to four hours long.')
+      }
       const created = await communityRequest<AmenityBooking>(
         `/${activeCommunityId}/amenities/bookings`,
         accessToken,
@@ -1366,10 +1329,22 @@ function App() {
     ) ?? communityMemberships[0]
   const activeCommunity = activeMembership.community.name
   const isAdministrator = activeMembership.roles.includes('ADMINISTRATOR')
+  const workspaceRole = isAdministrator
+    ? 'Administrator'
+    : activeMembership.roles.includes('MAINTENANCE_STAFF')
+      ? 'Maintenance staff'
+      : activeMembership.roles.includes('SECURITY_GUARD')
+        ? 'Security guard'
+        : 'Resident'
   const canManageRequests =
     isAdministrator || activeMembership.roles.includes('MAINTENANCE_STAFF')
   const canManageVisitors =
     isAdministrator || activeMembership.roles.includes('SECURITY_GUARD')
+  const displayPageLabel = (page: string) => {
+    if (page === 'My requests') return canManageRequests ? 'Service desk' : 'My requests'
+    if (page === 'Visitor log') return canManageVisitors ? 'Visitor management' : 'Visitor passes'
+    return page
+  }
   const today = new Date()
   const visitorsToday = visitorPasses.filter((pass) => {
     const arrival = new Date(pass.expectedAt)
@@ -1462,13 +1437,27 @@ function App() {
           {navigation.slice(0, 1).map((item) => (
             <NavItem key={item.label} item={item} active={activePage === item.label} onClick={goTo} requestCount={unresolvedRequestCount} />
           ))}
-          <span className="nav-label nav-label-spaced">YOUR COMMUNITY</span>
-          {communityNavigation.filter((item) => !['Blocks & homes', 'Invitations', 'Security team'].includes(item.label)).map((item) => (
-            <NavItem key={item.label} item={item} active={activePage === item.label} onClick={goTo} requestCount={unresolvedRequestCount} />
-          ))}
+          <span className="nav-label nav-label-spaced">
+            {isAdministrator ? 'COMMUNITY ACCESS' : workspaceRole === 'Resident' ? 'RESIDENT SERVICES' : 'COMMUNITY SERVICES'}
+          </span>
+          {communityNavigation
+            .filter((item) => !isAdministrator || item.label === 'Amenities')
+            .map((item) => (
+              <NavItem key={item.label} item={item} active={activePage === item.label} onClick={goTo} requestCount={unresolvedRequestCount} displayLabel={displayPageLabel(item.label)} />
+            ))}
           {isAdministrator && (
             <>
-              <span className="nav-label nav-label-spaced">ADMINISTRATION</span>
+              <span className="nav-label nav-label-spaced">COMMUNITY OPERATIONS</span>
+              {communityNavigation
+                .filter((item) => ['My requests', 'Visitor log'].includes(item.label))
+                .map((item) => (
+                  <NavItem key={item.label} item={item} active={activePage === item.label} onClick={goTo} requestCount={unresolvedRequestCount} displayLabel={displayPageLabel(item.label)} />
+                ))}
+            </>
+          )}
+          {isAdministrator && (
+            <>
+              <span className="nav-label nav-label-spaced nav-label-admin">ADMINISTRATOR TOOLS</span>
               <NavItem
                 item={{ label: 'Blocks & homes', icon: 'building' }}
                 active={activePage === 'Blocks & homes'}
@@ -1500,7 +1489,7 @@ function App() {
           </div>
           <button className="profile-button" type="button" onClick={() => goTo('My profile')}>
             <span className="avatar avatar-profile">{initials}</span>
-            <span className="profile-copy"><strong>{authUser.fullName}</strong><span>{isAdministrator ? 'Community administrator' : 'Community member'}</span></span>
+            <span className="profile-copy"><strong>{authUser.fullName}</strong><span>{workspaceRole}</span></span>
             <Icon name="more" size={18} />
           </button>
           <button className="sign-out-button" type="button" disabled={authBusy} onClick={handleLogout}>
@@ -1514,28 +1503,21 @@ function App() {
       <main className="main-area">
         <header className="topbar">
           <button className="mobile-menu icon-button" aria-label="Open navigation" onClick={() => setMenuOpen(true)}><Icon name="menu" /></button>
-          <div className="breadcrumb"><span>{activeCommunity}</span><span className="breadcrumb-separator">/</span><strong>{activePage}</strong></div>
+          <div className="breadcrumb"><span>{activeCommunity}</span><span className="breadcrumb-separator">/</span><strong>{displayPageLabel(activePage)}</strong></div>
           <div className="topbar-actions">
+            <span className={`workspace-role-badge${isAdministrator ? ' workspace-role-admin' : ''}`}>
+              <span aria-hidden="true" />
+              {workspaceRole} workspace
+            </span>
             {searchOpen ? (
               <div className="search-wrap">
                 <Icon name="search" size={16} />
-                <input className="search-input" autoFocus aria-label="Search community" placeholder="Search requests & updates..." value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Escape') { setSearchQuery(''); setSearchOpen(false) } }} />
+                <input className="search-input" autoFocus aria-label="Search service requests" placeholder="Search requests..." value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Escape') { setSearchQuery(''); setSearchOpen(false) } }} />
                 {searchQuery && <button className="search-clear" aria-label="Clear search" onClick={() => setSearchQuery('')}><Icon name="close" size={14} /></button>}
               </div>
             ) : (
               <button className="icon-button" aria-label="Search" onClick={() => setSearchOpen(true)}><Icon name="search" /></button>
             )}
-            <div className="notification-wrap">
-              <button className="icon-button notification-button" aria-label="Notifications" aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen(!notificationsOpen)}><Icon name="bell" />{hasUnreadNotifications && <span />}</button>
-              {notificationsOpen && (
-                <section className="notification-popover" aria-label="Notifications">
-                  <div className="notification-popover-head"><div><span className="section-kicker">YOUR COMMUNITY</span><h2>Little updates</h2></div><button onClick={() => setHasUnreadNotifications(false)}>Mark all read</button></div>
-                  <button className="notification-item" onClick={() => { setNotificationsOpen(false); goTo('Announcements') }}><span className="notification-item-icon notification-purple"><Icon name="megaphone" size={16} /></span><span><strong>Something new in Block A</strong><small>Water tank cleaning this Saturday · 2h ago</small></span><i /></button>
-                  <button className="notification-item" onClick={() => { setNotificationsOpen(false); goTo('My requests') }}><span className="notification-item-icon notification-green"><Icon name="inbox" size={16} /></span><span><strong>Your repair is moving along</strong><small>Water pressure request updated · 4h ago</small></span><i /></button>
-                  <p className="notification-demo-note">Preview notifications · sample data</p>
-                </section>
-              )}
-            </div>
             <span className="topbar-divider" />
             <button className="topbar-profile" type="button" onClick={() => goTo('My profile')}><span className="avatar avatar-profile">{initials}</span><span>{firstName}</span><Icon name="chevron" size={15} /></button>
           </div>
@@ -1598,7 +1580,7 @@ function App() {
             loading={visitorPassesLoading}
             error={visitorPassesError || visitorError}
             unitsLoading={visitorUnitsLoading}
-            canCreatePass={visitorUnits.length > 0}
+            canCreatePass={!canManageVisitors && visitorUnits.length > 0}
             canManageVisitors={canManageVisitors}
             statusBusy={visitorStatusBusy}
             onCreatePass={() => setModalType('visitor')}
@@ -1628,16 +1610,18 @@ function App() {
             onStatusUpdate={handleUpdateRequestStatus}
             showAllRequests={showAllRequests}
             setShowAllRequests={setShowAllRequests}
-            showAllAnnouncements={showAllAnnouncements}
-            setShowAllAnnouncements={setShowAllAnnouncements}
             searchQuery={searchQuery}
             firstName={firstName}
             communityName={activeCommunity}
+            canManageVisitors={canManageVisitors}
+            visitorPasses={visitorPasses}
             visitorsToday={visitorsToday}
             checkedInVisitorsToday={checkedInVisitorsToday}
             expectedVisitorsToday={expectedVisitorsToday}
             visitorsLoading={visitorPassesLoading}
             visitorsError={visitorPassesError}
+            visitorStatusBusy={visitorStatusBusy}
+            onVisitorStatusUpdate={handleUpdateVisitorStatus}
             amenityBookings={upcomingAmenityBookings}
             amenitiesLoading={amenitiesLoading}
             amenitiesError={amenitiesError}
@@ -2101,16 +2085,18 @@ function NavItem({
   active,
   onClick,
   requestCount,
+  displayLabel = item.label,
 }: {
   item: { label: string; icon: IconName }
   active: boolean
   onClick: (page: string) => void
   requestCount: number
+  displayLabel?: string
 }) {
   return (
     <button className={`nav-item ${active ? 'nav-item-active' : ''}`} type="button" onClick={() => onClick(item.label)}>
       <Icon name={item.icon} size={19} />
-      <span>{item.label}</span>
+      <span>{displayLabel}</span>
       {item.label === 'My requests' && requestCount > 0 && <span className="nav-count">{requestCount}</span>}
     </button>
   )
@@ -2289,28 +2275,40 @@ function MyRequestsScreen({
   ) => void
   onNewRequest: () => void
 }) {
+  const title = canManageRequests ? 'Service requests' : 'My requests'
   return (
     <section className="my-requests-page">
       <header className="my-requests-heading">
         <div>
-          <p className="eyebrow">YOUR COMMUNITY · SERVICE DESK</p>
-          <h1>My requests</h1>
-          <p>Keep track of issues you’ve reported to your community team.</p>
+          <p className="eyebrow">YOUR COMMUNITY · {canManageRequests ? 'OPERATIONS' : 'SERVICE DESK'}</p>
+          <h1>{title}</h1>
+          <p>
+            {canManageRequests
+              ? 'Review resident-reported issues and move each one through to resolution.'
+              : 'Report a community issue and follow its progress through to resolution.'}
+          </p>
         </div>
-        <button className="button button-primary" type="button" onClick={onNewRequest}>
-          <Icon name="plus" size={16} /> New request
-        </button>
+        {!canManageRequests && (
+          <button className="button button-primary" type="button" onClick={onNewRequest}>
+            <Icon name="plus" size={16} /> Report an issue
+          </button>
+        )}
       </header>
       <section className="panel my-requests-panel">
         <div className="panel-heading">
-          <div><p className="section-kicker">REPAIR TRACKER</p><h2>Your submitted requests</h2></div>
+          <div>
+            <p className="section-kicker">{canManageRequests ? 'COMMUNITY WORK QUEUE' : 'YOUR REPAIR TRACKER'}</p>
+            <h2>{canManageRequests ? 'All community requests' : 'Your submitted requests'}</h2>
+          </div>
           <span className="heading-count">{requests.length.toString().padStart(2, '0')}</span>
         </div>
         <ServiceRequestRows
           requests={requests}
           loading={loading}
           error={error}
-          emptyMessage="No requests yet. Report an issue and it will show up here."
+          emptyMessage={canManageRequests
+            ? 'No open community requests. New resident issues will appear here.'
+            : 'No requests yet. Report an issue and it will show up here.'}
           canManageRequests={canManageRequests}
           statusBusy={statusBusy}
           onStatusUpdate={onStatusUpdate}
@@ -2354,26 +2352,33 @@ function VisitorLogScreen({
   onCreatePass: () => void
   onUpdateStatus: (passId: string, status: VisitorPassStatus) => void
 }) {
+  const title = canManageVisitors ? 'Visitor management' : 'Visitor passes'
   return (
     <section className="visitor-page">
       <header className="my-requests-heading">
         <div>
-          <p className="eyebrow">YOUR COMMUNITY · FRONT DESK</p>
-          <h1>Visitor log</h1>
-          <p>Register an expected guest and keep track of their visit.</p>
+          <p className="eyebrow">YOUR COMMUNITY · {canManageVisitors ? 'ARRIVAL DESK' : 'GUEST ACCESS'}</p>
+          <h1>{title}</h1>
+          <p>
+            {canManageVisitors
+              ? 'Review expected visitors and record their check-in and check-out.'
+              : 'Create a visitor pass for your apartment and keep track of each visit.'}
+          </p>
         </div>
-        <button
-          className="button button-primary"
-          type="button"
-          onClick={onCreatePass}
-          disabled={unitsLoading || !canCreatePass}
-        >
-          <Icon name="plus" size={16} /> Create visitor pass
-        </button>
+        {!canManageVisitors && (
+          <button
+            className="button button-primary"
+            type="button"
+            onClick={onCreatePass}
+            disabled={unitsLoading || !canCreatePass}
+          >
+            <Icon name="plus" size={16} /> Create visitor pass
+          </button>
+        )}
       </header>
 
       {error && <p className="auth-error request-list-error" role="alert">{error}</p>}
-      {!unitsLoading && !canCreatePass && (
+      {!canManageVisitors && !unitsLoading && !canCreatePass && (
         <p className="visitor-unit-help">
           Your account needs an apartment linked by a community administrator before you can create visitor passes.
         </p>
@@ -2391,7 +2396,11 @@ function VisitorLogScreen({
         {loading ? (
           <p className="empty-search" role="status">Loading visitor passes…</p>
         ) : passes.length === 0 ? (
-          <p className="empty-search">No visitor passes yet. Create one when you’re expecting a guest.</p>
+          <p className="empty-search">
+            {canManageVisitors
+              ? 'No expected visitors yet. Resident-created passes will appear here.'
+              : 'No visitor passes yet. Create one when you’re expecting a guest.'}
+          </p>
         ) : (
           <div className="visitor-list">
             {passes.map((pass) => {
@@ -2501,8 +2510,18 @@ function AmenitiesScreen({
         <div>
           <p className="eyebrow">YOUR COMMUNITY · SHARED SPACES</p>
           <h1>Amenities</h1>
-          <p>Find a time for the spaces you love, with availability kept up to date.</p>
+          <p>Explore shared spaces and find a time that works for you.</p>
         </div>
+        {amenities.some((amenity) => amenity.isActive) && (
+          <button
+            className="button button-primary amenity-header-action"
+            type="button"
+            onClick={() => onBook('')}
+          >
+            <Icon name="calendar" size={16} />
+            Book a space
+          </button>
+        )}
       </header>
 
       {error && <p className="auth-error request-list-error" role="alert">{error}</p>}
@@ -2553,11 +2572,22 @@ function AmenitiesScreen({
         ) : (
           <div className="amenity-grid">
             {amenities.map((amenity) => (
-              <article className={`amenity-card${amenity.isActive ? '' : ' amenity-card-inactive'}`} key={amenity.id}>
-                <span className="amenity-card-icon"><Icon name="calendar" size={21} /></span>
-                <div className="amenity-card-heading">
-                  <h3>{amenity.name}</h3>
-                  {!amenity.isActive && <span className="amenity-inactive-label">Unavailable</span>}
+              <article
+                className={`amenity-card${amenity.isActive ? '' : ' amenity-card-inactive'}`}
+                key={amenity.id}
+              >
+                <div className="amenity-card-top">
+                  <span className="amenity-card-icon" aria-hidden="true">
+                    <Icon name="calendar" size={21} />
+                  </span>
+                  <div className="amenity-card-heading">
+                    <h3>{amenity.name}</h3>
+                    <span
+                      className={`amenity-availability${amenity.isActive ? '' : ' amenity-availability-off'}`}
+                    >
+                      {amenity.isActive ? 'Available to book' : 'Unavailable'}
+                    </span>
+                  </div>
                 </div>
                 <p className="amenity-card-location">{amenity.location || 'Community space'}</p>
                 <p className="amenity-card-description">{amenity.description || 'Reserve a time that works for you.'}</p>
@@ -2568,7 +2598,7 @@ function AmenitiesScreen({
                       type="button"
                       onClick={() => onBook(amenity.id)}
                     >
-                      Book a time <Icon name="arrow" size={14} />
+                      Book this space <Icon name="arrow" size={14} />
                     </button>
                   )}
                   {canManage && (
@@ -2599,7 +2629,18 @@ function AmenitiesScreen({
         {loading ? (
           <p className="empty-search" role="status">Loading reservations…</p>
         ) : bookings.length === 0 ? (
-          <p className="empty-search">No upcoming reservations. Book an available amenity to get started.</p>
+          <div className="amenity-bookings-empty">
+            <span className="amenity-booking-icon" aria-hidden="true"><Icon name="clock" size={18} /></span>
+            <div>
+              <strong>No reservations yet</strong>
+              <p>Once you book a shared space, it will show up here.</p>
+            </div>
+            {amenities.some((amenity) => amenity.isActive) && (
+              <button className="amenity-empty-action" type="button" onClick={() => onBook('')}>
+                Browse spaces
+              </button>
+            )}
+          </div>
         ) : (
           <div className="amenity-booking-list">
             {bookings.map((booking) => (
@@ -2610,7 +2651,11 @@ function AmenitiesScreen({
                 <span className="amenity-booking-icon"><Icon name="clock" size={18} /></span>
                 <div className="amenity-booking-details">
                   <strong>{booking.amenityName}</strong>
-                  <span>{dateTime(booking.startsAt)} – {new Intl.DateTimeFormat(undefined, { timeStyle: 'short' }).format(new Date(booking.endsAt))}</span>
+                  <span>
+                    <time dateTime={booking.startsAt}>{dateTime(booking.startsAt)}</time>
+                    {' – '}
+                    <time dateTime={booking.endsAt}>{dateTime(booking.endsAt)}</time>
+                  </span>
                   <small>
                     {booking.status === 'CANCELLED'
                       ? 'Cancelled'
@@ -2621,9 +2666,11 @@ function AmenitiesScreen({
                           : 'Reserved'}
                   </small>
                 </div>
-                {booking.status === 'CONFIRMED' && (
-                  <span className="amenity-booking-status">Confirmed</span>
-                )}
+                <span
+                  className={`amenity-booking-status${booking.status === 'CANCELLED' ? ' amenity-booking-status-cancelled' : ''}`}
+                >
+                  {booking.status === 'CONFIRMED' ? 'Confirmed' : 'Cancelled'}
+                </span>
                 {booking.canCancel && booking.status === 'CONFIRMED' && (
                   <button
                     className="amenity-cancel-action"
@@ -2739,16 +2786,18 @@ function Dashboard({
   onStatusUpdate,
   showAllRequests,
   setShowAllRequests,
-  showAllAnnouncements,
-  setShowAllAnnouncements,
   searchQuery,
   firstName,
   communityName,
+  canManageVisitors,
+  visitorPasses,
   visitorsToday,
   checkedInVisitorsToday,
   expectedVisitorsToday,
   visitorsLoading,
   visitorsError,
+  visitorStatusBusy,
+  onVisitorStatusUpdate,
   amenityBookings,
   amenitiesLoading,
   amenitiesError,
@@ -2768,16 +2817,18 @@ function Dashboard({
   ) => void
   showAllRequests: boolean
   setShowAllRequests: (value: boolean) => void
-  showAllAnnouncements: boolean
-  setShowAllAnnouncements: (value: boolean) => void
   searchQuery: string
   firstName: string
   communityName: string
+  canManageVisitors: boolean
+  visitorPasses: VisitorPass[]
   visitorsToday: number
   checkedInVisitorsToday: number
   expectedVisitorsToday: number
   visitorsLoading: boolean
   visitorsError: string
+  visitorStatusBusy: boolean
+  onVisitorStatusUpdate: (passId: string, status: VisitorPassStatus) => void
   amenityBookings: AmenityBooking[]
   amenitiesLoading: boolean
   amenitiesError: string
@@ -2793,14 +2844,17 @@ function Dashboard({
     return matchesStatus && matchesQuery
   })
   const visibleRequests = showAllRequests || query || requestFilter !== 'All' ? matchingRequests : matchingRequests.slice(0, 3)
-  const matchingAnnouncements = announcements.filter((announcement) =>
-    !query || `${announcement.tag} ${announcement.title} ${announcement.body}`.toLowerCase().includes(query),
-  )
-  const visibleAnnouncements = showAllAnnouncements || query ? matchingAnnouncements : matchingAnnouncements.slice(0, 2)
   const openRequestCount = requests.filter((request) => request.status === 'OPEN').length
   const inProgressRequestCount = requests.filter((request) => request.status === 'IN_PROGRESS').length
   const unresolvedRequestCount = openRequestCount + inProgressRequestCount
   const nextAmenityBooking = amenityBookings[0]
+  const today = new Date()
+  const todaysPasses = visitorPasses
+    .filter((pass) => {
+      const arrival = new Date(pass.expectedAt)
+      return arrival.toDateString() === today.toDateString()
+    })
+    .slice(0, 4)
 
   return (
     <div className="dashboard-page">
@@ -2808,25 +2862,42 @@ function Dashboard({
         <div>
           <p className="eyebrow">{new Intl.DateTimeFormat('en', { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date()).toUpperCase()} <span className="eyebrow-dot">·</span> {communityName.toUpperCase()}</p>
           <h1>Hey {firstName}, you’re home <span className="wave">✳</span></h1>
-          <p className="heading-subtitle">Your people, your place, your day — all looking good.</p>
+          <p className="heading-subtitle">
+            {canManageRequests || canManageVisitors
+              ? 'A clear view of resident requests, visitor arrivals and shared spaces.'
+              : 'Report an issue, arrange a visitor pass and stay connected to your community.'}
+          </p>
         </div>
-        <button className="button button-primary" onClick={() => openAction('request')}><Icon name="plus" size={17} /> New request</button>
+        {canManageRequests ? (
+          <button className="button button-primary" onClick={() => goTo('My requests')}>
+            <Icon name="inbox" size={17} /> Review requests
+          </button>
+        ) : (
+          <button className="button button-primary" onClick={() => openAction('request')}>
+            <Icon name="plus" size={17} /> Report an issue
+          </button>
+        )}
       </div>
 
       <section className="welcome-banner">
         <div className="welcome-copy">
-          <span className="welcome-kicker"><span className="live-dot" /> THE GOOD STUFF, ALL TOGETHER</span>
-          <h2>Your community.<br />Your kind of <em>everyday.</em></h2>
-          <p>Little updates, helpful people and more time to feel at home.</p>
-          <button type="button" onClick={() => goTo('Announcements')}>See what’s new <Icon name="arrow" size={15} /></button>
+          <span className="welcome-kicker"><span className="live-dot" /> COMMUNITY OPERATIONS</span>
+          <h2>{canManageRequests || canManageVisitors ? <>Support your<br /><em>community.</em></> : <>Your community.<br />Your kind of <em>everyday.</em></>}</h2>
+          <p>
+            {canManageRequests || canManageVisitors
+              ? 'Help residents get answers and make arrivals easy to manage.'
+              : 'Your requests and visitor passes, together in one place.'}
+          </p>
+          <button type="button" onClick={() => goTo(canManageRequests ? 'My requests' : 'Visitor log')}>
+            {canManageRequests ? 'Open service desk' : 'Manage visitor passes'} <Icon name="arrow" size={15} />
+          </button>
         </div>
         <img className="welcome-illustration" src={communityIllustration} alt="" aria-hidden="true" />
         <span className="banner-sparkle sparkle-one"><Icon name="sparkle" size={22} /></span><span className="banner-sparkle sparkle-two"><Icon name="sparkle" size={16} /></span>
       </section>
 
-      <section className="stats-grid" aria-label="Your community at a glance">
-        <StatCard label="Unresolved requests" value={unresolvedRequestCount.toString().padStart(2, '0')} note={`${openRequestCount} open · ${inProgressRequestCount} in progress`} icon="inbox" tone="green" onClick={() => goTo('My requests')} />
-        <StatCard label="Maintenance due" value={`₹${pendingMaintenance.toLocaleString('en-IN')}`} note="Due 25 October" icon="wallet" tone="gold" onClick={() => goTo('My payments')} />
+      <section className="stats-grid" aria-label="Community operations at a glance">
+        <StatCard label={canManageRequests ? 'Requests to resolve' : 'Your unresolved requests'} value={unresolvedRequestCount.toString().padStart(2, '0')} note={`${openRequestCount} open · ${inProgressRequestCount} in progress`} icon="inbox" tone="green" onClick={() => goTo('My requests')} />
         <StatCard
           label="Upcoming bookings"
           value={
@@ -2860,7 +2931,7 @@ function Dashboard({
           }
           note={
             visitorsError
-              ? 'Unable to load visitor log'
+              ? 'Unable to load visitor passes'
               : visitorsLoading
                 ? 'Loading visitor data'
                 : `${checkedInVisitorsToday} checked in · ${expectedVisitorsToday} expected`
@@ -2873,15 +2944,26 @@ function Dashboard({
 
       <section className="quick-actions" aria-label="Quick actions">
         <span className="quick-actions-label">QUICK ACTIONS</span>
-        <button type="button" onClick={() => openAction('request')}><span className="quick-icon quick-coral"><Icon name="plus" size={16} /></span>Report an issue<Icon className="quick-arrow" name="arrow" size={13} /></button>
-        <button type="button" onClick={() => openAction('visitor')}><span className="quick-icon quick-blue"><Icon name="car" size={16} /></span>Invite a visitor<Icon className="quick-arrow" name="arrow" size={13} /></button>
+        <button type="button" onClick={() => canManageRequests ? goTo('My requests') : openAction('request')}>
+          <span className="quick-icon quick-coral"><Icon name={canManageRequests ? 'inbox' : 'plus'} size={16} /></span>
+          {canManageRequests ? 'Resolve service requests' : 'Report an issue'}
+          <Icon className="quick-arrow" name="arrow" size={13} />
+        </button>
+        <button type="button" onClick={() => canManageVisitors ? goTo('Visitor log') : openAction('visitor')}>
+          <span className="quick-icon quick-blue"><Icon name={canManageVisitors ? 'door' : 'car'} size={16} /></span>
+          {canManageVisitors ? 'Manage visitor arrivals' : 'Create visitor pass'}
+          <Icon className="quick-arrow" name="arrow" size={13} />
+        </button>
         <button type="button" onClick={() => openAction('booking')}><span className="quick-icon quick-yellow"><Icon name="calendar" size={16} /></span>Book an amenity<Icon className="quick-arrow" name="arrow" size={13} /></button>
       </section>
 
       <div className="content-grid">
         <section className="panel requests-panel">
           <div className="panel-heading">
-            <div><p className="section-kicker">YOUR NEIGHBORHOOD</p><h2>Requests, in the works <span className="heading-count">{requests.length.toString().padStart(2, '0')}</span></h2></div>
+            <div>
+              <p className="section-kicker">{canManageRequests ? 'COMMUNITY WORK QUEUE' : 'YOUR SERVICE DESK'}</p>
+              <h2>{canManageRequests ? 'Issues to resolve' : 'Your reported issues'} <span className="heading-count">{requests.length.toString().padStart(2, '0')}</span></h2>
+            </div>
             <button className="text-link" type="button" onClick={() => setShowAllRequests(!showAllRequests)}>{showAllRequests ? 'Show recent' : 'View all'} <Icon name="arrow" size={14} /></button>
           </div>
           <div className="request-filter-row" aria-label="Filter requests">
@@ -2895,34 +2977,67 @@ function Dashboard({
             error={requestsError}
             emptyMessage={searchQuery || requestFilter !== 'All'
               ? `No requests match “${searchQuery || requestFilter}”. Try another search or filter.`
-              : 'No requests reported yet. Add one and it will appear here.'}
+              : canManageRequests
+                ? 'No community requests to resolve right now.'
+                : 'No requests reported yet. Report an issue and it will appear here.'}
             canManageRequests={canManageRequests}
             statusBusy={requestStatusBusy}
             onStatusUpdate={onStatusUpdate}
           />
           {requestStatusError && <p className="auth-error request-list-error" role="alert">{requestStatusError}</p>}
-          <button className="panel-bottom-link" type="button" onClick={() => goTo('My requests')}>Go to my requests <Icon name="arrow" size={14} /></button>
+          <button className="panel-bottom-link" type="button" onClick={() => goTo('My requests')}>
+            {canManageRequests ? 'Open service desk' : 'Go to my requests'} <Icon name="arrow" size={14} />
+          </button>
         </section>
 
-        <section className="panel announcements-panel">
+        <section className="panel arrivals-panel">
           <div className="panel-heading">
-            <div><p className="section-kicker">A NOTE FROM YOUR COMMUNITY</p><h2>Good things bulletin <span className="heading-count">{announcements.length.toString().padStart(2, '0')}</span></h2></div>
-            <button className="text-link" type="button" onClick={() => setShowAllAnnouncements(!showAllAnnouncements)}>{showAllAnnouncements ? 'Show recent' : 'View all'} <Icon name="arrow" size={14} /></button>
+            <div>
+              <p className="section-kicker">{canManageVisitors ? 'ARRIVAL DESK' : 'YOUR GUESTS'}</p>
+              <h2>{canManageVisitors ? 'Expected today' : 'Your visitors today'} <span className="heading-count">{visitorsToday.toString().padStart(2, '0')}</span></h2>
+            </div>
+            <button className="text-link" type="button" onClick={() => goTo('Visitor log')}>View all <Icon name="arrow" size={14} /></button>
           </div>
-          <div className="announcement-list">
-            {visibleAnnouncements.map((announcement) => (
-              <article className="announcement-card" key={announcement.title}>
-                <div className={`announcement-accent accent-${announcement.color}`} />
-                <div className="announcement-content">
-                  <div className="announcement-meta"><span className={`announcement-tag tag-${announcement.color}`}>{announcement.tag}</span><span>{announcement.date}</span></div>
-                  <h3>{announcement.title}</h3>
-                  <p>{announcement.body}</p>
-                </div>
-              </article>
-            ))}
-            {visibleAnnouncements.length === 0 && <p className="empty-search">No community updates match “{searchQuery}”.</p>}
-          </div>
-          <button className="panel-bottom-link" type="button" onClick={() => goTo('Announcements')}>All announcements <Icon name="arrow" size={14} /></button>
+          {visitorsLoading ? (
+            <p className="empty-search" role="status">Loading visitor passes…</p>
+          ) : visitorsError ? (
+            <p className="auth-error request-list-error" role="alert">{visitorsError}</p>
+          ) : todaysPasses.length === 0 ? (
+            <p className="empty-search">{canManageVisitors ? 'No expected arrivals today.' : 'No visitor passes scheduled for today.'}</p>
+          ) : (
+            <div className="dashboard-arrival-list">
+              {todaysPasses.map((pass) => {
+                const nextStatus = pass.status === 'EXPECTED'
+                  ? 'CHECKED_IN'
+                  : pass.status === 'CHECKED_IN'
+                    ? 'CHECKED_OUT'
+                    : null
+                return (
+                  <article className="dashboard-arrival-row" key={pass.id}>
+                    <span className="visitor-pass-icon"><Icon name="door" size={17} /></span>
+                    <div className="dashboard-arrival-details">
+                      <strong>{pass.visitorName}</strong>
+                      <span>{pass.unit.block.name} · Apt {pass.unit.number} · {pass.hostName}</span>
+                      <span>{new Intl.DateTimeFormat(undefined, { timeStyle: 'short' }).format(new Date(pass.expectedAt))} · {visitorStatusLabel(pass.status)}</span>
+                    </div>
+                    {canManageVisitors && nextStatus && (
+                      <button
+                        className="visitor-pass-action"
+                        type="button"
+                        disabled={visitorStatusBusy}
+                        onClick={() => onVisitorStatusUpdate(pass.id, nextStatus)}
+                      >
+                        {visitorStatusBusy ? 'Updating…' : nextStatus === 'CHECKED_IN' ? 'Check in' : 'Check out'}
+                      </button>
+                    )}
+                  </article>
+                )
+              })}
+            </div>
+          )}
+          {canManageVisitors && visitorsToday > todaysPasses.length && (
+            <button className="panel-bottom-link" type="button" onClick={() => goTo('Visitor log')}>Open arrival desk <Icon name="arrow" size={14} /></button>
+          )}
         </section>
       </div>
 
@@ -2957,18 +3072,7 @@ function Dashboard({
           </div>
           <div className="next-up-art" aria-hidden="true"><span className="art-orbit orbit-one" /><span className="art-orbit orbit-two" /><span className="art-sun" /><span className="art-leaf leaf-one" /><span className="art-leaf leaf-two" /><span className="art-leaf leaf-three" /></div>
         </article>
-
-        <article className="payment-card">
-          <div className="payment-card-top"><span className="payment-icon"><Icon name="wallet" size={17} /></span><span className="payment-label">MAINTENANCE · OCTOBER</span><span className="payment-due-badge">DUE SOON</span></div>
-          <p className="section-kicker">OCTOBER 2026</p>
-          <h2>₹{pendingMaintenance.toLocaleString('en-IN')} <span>due 25 Oct</span></h2>
-          <p className="payment-copy">Monthly maintenance for Apartment A-204. Pay by the due date to keep your account up to date.</p>
-          <button className="text-link" onClick={() => goTo('My payments')}>View payment details <Icon name="arrow" size={14} /></button>
-          <div className="payment-plant" aria-hidden="true"><i /><i /><i /><b /></div>
-        </article>
       </section>
-
-      <div className="demo-notice"><span><Icon name="clock" size={14} /></span> Preview feature data · Not live community records · {communityName}</div>
     </div>
   )
 }
@@ -3019,6 +3123,7 @@ function ActionModal({
   selectedAmenityId: string
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
 }) {
+  const [bookingStart, setBookingStart] = useState('')
   const today = new Date()
   const todayValue = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   const localDateTime = new Date(today.getTime() - today.getTimezoneOffset() * 60_000)
@@ -3098,8 +3203,28 @@ function ActionModal({
               ))}
             </select>
           </label>
-          <label>Starts at<input name="startsAt" required type="datetime-local" min={localDateTime} /></label>
-          <label>Ends at<input name="endsAt" required type="datetime-local" min={localDateTime} /></label>
+          <label>
+            Starts at
+            <input
+              name="startsAt"
+              required
+              type="datetime-local"
+              min={localDateTime}
+              onChange={(event) => setBookingStart(event.currentTarget.value)}
+            />
+          </label>
+          <label>
+            Ends at
+            <input
+              name="endsAt"
+              required
+              type="datetime-local"
+              min={bookingStart || localDateTime}
+            />
+          </label>
+          <p className="booking-time-hint">
+            Choose a future time. Reservations can last up to four hours.
+          </p>
         </>
       ),
     },

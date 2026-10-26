@@ -72,17 +72,18 @@ or creates an account, then redeems the code to join with resident access. Codes
 are stored as hashes, and can be revoked before redemption. The dashboard’s
 request tracker now saves issues to PostgreSQL: residents see their own
 requests, while administrators and maintenance staff can see requests across
-their community. New reports appear at the top of the dashboard and under
-**My requests**. Maintenance payments remain preview data for now.
+their community. Residents report issues from **My requests**; administrators
+and maintenance staff use the **Service desk** to advance them through
+resolution.
 
 Administrators and maintenance staff can move a request from **Open** to **In
 progress** and then **Resolved**. Each transition is saved with its actor,
 timestamp, and optional note; residents can open **Status history** on a request
 to follow those updates.
 
-Residents can also create apartment-linked visitor passes from **Visitor log**.
-Administrators and security guards can see all passes in their community and
-record each visitor’s check-in and check-out.
+Residents can create apartment-linked visitor passes from **Visitor passes**.
+Administrators and security guards use **Visitor management** to see
+community-wide arrivals and record each visitor’s check-in and check-out.
 Administrators can grant or remove security-guard access for active members in
 the **Security team** section.
 

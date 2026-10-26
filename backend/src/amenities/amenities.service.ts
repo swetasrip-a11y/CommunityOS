@@ -180,7 +180,7 @@ export class AmenitiesService {
     const booking = await this.prisma.$transaction(
       async (transaction: Prisma.TransactionClient) => {
         await transaction.$queryRaw`
-          SELECT pg_advisory_xact_lock(hashtext(${dto.amenityId}))
+          SELECT pg_advisory_xact_lock(hashtext(${dto.amenityId})::bigint)
         `;
         const amenity = await transaction.amenity.findFirst({
           where: { id: dto.amenityId, communityId, isActive: true },

@@ -113,6 +113,6 @@ scaling, and managed secrets must be selected and configured before release.
 
 ## Architecture diagram caveats
 
-The diagram shows the actual implemented API modules. Maintenance billing and
-payments do not yet have backend modules or tables. Announcements are also
-not persisted by the API; the visible bulletin is sample frontend content.
+The diagram shows the actual implemented API modules. Maintenance billing,
+payments, and announcements do not have backend modules or tables and are not
+included in the current interface.

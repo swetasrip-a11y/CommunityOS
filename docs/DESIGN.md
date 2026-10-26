@@ -57,16 +57,16 @@ administrators can cancel community bookings.
 
 - **Overview** — community snapshot, issue status, visitor counts, upcoming
   member reservations, quick actions, and presentation-only sample content.
-- **My requests** — request list, status history, and staff status controls.
-- **Visitor log** — expected guests, apartment and host, visit status, and
-  staff check-in/check-out actions.
+- **My requests / Service desk** — residents track their own requests; admins
+  and maintenance staff review community requests and move them through
+  resolution.
+- **Visitor passes / Visitor management** — residents create apartment-linked
+  passes; admins and security guards manage community arrivals and check-in/out.
 - **Amenities** — active amenity catalog, administrator setup and availability
   controls, upcoming reservation list, booking, and cancellation.
 - **Blocks & homes** — administrator setup of the community structure.
 - **Invitations** — administrator creation, status review, and revocation.
 - **Security team** — administrator assignment or removal of security access.
-- **My payments** and **Announcements** currently contain preview/sample
-  dashboard content; their underlying production features are not implemented.
 
 ## Visual design
 
@@ -99,14 +99,15 @@ The principal presentation code is in `frontend/src/main.tsx` and
 - Keep sensitive data out of screens where a user does not need it; for
   example, non-admins do not see other residents' names on the amenity
   schedule.
-- Clearly distinguish persistent features from sample content. The current
-  dashboard still contains sample announcements and a sample maintenance due
-  amount; neither is an implemented community record.
+- Keep resident actions distinct from staff operations: residents submit
+  requests and create visitor passes, while authorized staff process requests
+  and record visitor arrivals.
 
 ## Out of scope for this version
 
 - Block-specific announcements, as explicitly excluded from the desired
   project scope.
 - Maintenance invoice generation, resident billing, payment processing, and
-  payment reconciliation. The current payment display is sample data only.
+  payment reconciliation.
+- Community announcements and broadcast messaging.
 - Mobile-native apps and external payment or messaging integrations.
